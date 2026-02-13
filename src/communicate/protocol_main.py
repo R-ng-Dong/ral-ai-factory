@@ -22,7 +22,7 @@ from pathlib import Path
 from .ui.animation.toggleButton import ToggleButton
 from .ui import protocol_main_ui
 
-from . import MODBUS, TCPClient
+from . import MODBUS, TCPClient, MODBUS_RTU
 
 # from ..config import PROTOCOL_PATH
 
@@ -39,7 +39,11 @@ style = """
     }
 """
 
-AVAILABLE_PROTOCOLS = {"TCPClient": TCPClient, "MODBUS": MODBUS}
+AVAILABLE_PROTOCOLS = {
+    "TCPClient": TCPClient, 
+    "MODBUS_TCP": MODBUS,
+    "MODBUS_RTU": MODBUS_RTU
+}
 
 
 class CustomWidget(QWidget):
