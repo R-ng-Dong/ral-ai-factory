@@ -121,7 +121,8 @@ class UsbCameraProcessor(Processor):
 
         # Thử danh sách các backends theo thứ tự ưu tiên trên Windows
         # 0 (CAP_ANY) thường là tốt nhất để driver tự chọn
-        backends = [0, CAPS.CAP_DSHOW, CAPS.CAP_MSMF] if sys.platform == "win32" else [0, CAPS.CAP_V4L2]
+        # Ưu tiên CAP_DSHOW trên Windows vì nó ổn định hơn CAP_MSMF với nhiều loại camera
+        backends = [CAPS.CAP_DSHOW, CAPS.CAP_MSMF, 0] if sys.platform == "win32" else [0, CAPS.CAP_V4L2]
 
         last_error = ""
         for backend in backends:
@@ -213,20 +214,29 @@ class UsbCameraProcessor(Processor):
         - gọi grab() flush_count-1 lần (bỏ khung cũ)
         - sau đó read() lấy khung cuối
         """
-        if not self._cap:
+        if not self._cap or not self._cap.isOpened():
             return None
 
-        # flush bớt khung cũ
+        # flush bớt khung cũ để tránh delay
+        # Dùng grab() thay vì read() để nhanh hơn và giảm thiểu rủi ro memory allocation lỗi
         for _ in range(max(0, flush_count - 1)):
             try:
-                self._cap.read()
+                if not self._cap.grab():
+                    break
             except Exception:
                 break
 
-        ok, frame = self._cap.read()
-        if not ok or frame is None:
+        try:
+            ok, frame = self._cap.read()
+            if not ok or frame is None:
+                return None
+            return frame
+        except cv2.error as e:
+            print(f"   ⚠ OpenCV Read Error: {e}")
             return None
-        return frame
+        except Exception as e:
+            print(f"   ⚠ Unexpected Read Error: {e}")
+            return None
 
     def get_frame(self) -> Optional[np.ndarray]:
         """

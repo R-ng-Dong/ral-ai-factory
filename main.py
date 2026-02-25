@@ -284,6 +284,11 @@ class MainWindow(QMainWindow):
         
         # Detect → Status
         if BaseDetectWidget and isinstance(self.detect_widget, BaseDetectWidget):
+            self.detect_widget.result_ready.connect(
+                self._on_detect_result,
+                Qt.ConnectionType.QueuedConnection
+            )
+            
         # Protocol → App (Trigger)
         if hasattr(self, 'protocol_widget') and self.protocol_widget:
             self.protocol_widget.rx_data.connect(self._on_protocol_rx)

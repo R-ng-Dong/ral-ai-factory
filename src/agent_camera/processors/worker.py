@@ -33,12 +33,16 @@ class Worker(QThread):
         Nếu `get_frame()` trả None thì tạm ngủ một khoảng ngắn để tránh busy-loop.
         """
         while self._running:
-            frame = self.camera_instance.get_frame()
-            if frame is None:
+            try:
+                frame = self.camera_instance.get_frame()
+                if frame is None:
+                    time.sleep(0.01)
+                    continue
+                self.frame_ready.emit(frame)
                 time.sleep(0.01)
-                continue
-            self.frame_ready.emit(frame)
-            time.sleep(0.01)
+            except Exception as e:
+                print(f"[Worker Error] {e}")
+                time.sleep(0.1)
 
     def stop(self):
         """Yêu cầu dừng worker, gọi quit() và chờ thread kết thúc bằng wait()."""
