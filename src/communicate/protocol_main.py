@@ -22,7 +22,7 @@ from pathlib import Path
 from .ui.animation.toggleButton import ToggleButton
 from .ui import protocol_main_ui
 
-from . import MODBUS, TCPClient, MODBUS_RTU
+from . import MODBUS, TCPClient, MODBUS_RTU, SerialClient
 
 # from ..config import PROTOCOL_PATH
 
@@ -42,7 +42,8 @@ style = """
 AVAILABLE_PROTOCOLS = {
     "TCPClient": TCPClient, 
     "MODBUS_TCP": MODBUS,
-    "MODBUS_RTU": MODBUS_RTU
+    "MODBUS_RTU": MODBUS_RTU,
+    "SERIAL_RAW": SerialClient
 }
 
 

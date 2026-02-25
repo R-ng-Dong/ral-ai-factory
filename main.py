@@ -11,7 +11,9 @@ Luồng dữ liệu: Camera → Detect → Protocol
 
 import sys
 import os
+import cv2
 from pathlib import Path
+from datetime import datetime
 
 # Silence noisy system logs
 os.environ["OPENCV_LOG_LEVEL"] = "ERROR"
@@ -75,6 +77,10 @@ class MainWindow(QMainWindow):
         
         # Trạng thái
         self._first_frame = True
+        self._last_frame = None # Lưu frame mới nhất
+        
+        # Setup folders
+        self._init_folders()
         
         # Setup UI
         self._setup_ui()
@@ -92,6 +98,26 @@ class MainWindow(QMainWindow):
         
         # Hiển thị thông báo sẵn sàng
         self.statusBar().showMessage("✓ Sẵn sàng - Video Viewer đã được kích hoạt", 4000)
+
+    def _init_folders(self):
+        """Tạo các thư mục cần thiết."""
+        os.makedirs("images", exist_ok=True)
+
+    def _take_snapshot(self):
+        """Chụp ảnh từ frame hiện tại."""
+        if self._last_frame is None:
+            self.status_bar.showMessage("⚠️ Không có frame để chụp!", 3000)
+            return
+            
+        try:
+            timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+            filename = f"images/{timestamp}.jpg"
+            cv2.imwrite(filename, self._last_frame)
+            self.status_bar.showMessage(f"📸 Đã lưu ảnh: {filename}", 3000)
+            print(f"[Snapshot] Saved to {filename}")
+        except Exception as e:
+            print(f"Lỗi chụp ảnh: {e}")
+            self.status_bar.showMessage(f"❌ Lỗi chụp ảnh: {e}", 3000)
 
     def _setup_ui(self):
         """Thiết lập giao diện tích hợp Video + Tabs."""
@@ -258,10 +284,16 @@ class MainWindow(QMainWindow):
         
         # Detect → Status
         if BaseDetectWidget and isinstance(self.detect_widget, BaseDetectWidget):
-            self.detect_widget.result_ready.connect(
-                self._on_detect_result,
-                Qt.ConnectionType.QueuedConnection
-            )
+        # Protocol → App (Trigger)
+        if hasattr(self, 'protocol_widget') and self.protocol_widget:
+            self.protocol_widget.rx_data.connect(self._on_protocol_rx)
+
+    def _on_protocol_rx(self, data: str):
+        """Xử lý dữ liệu nhận được từ bất kỳ Protocol nào."""
+        # Kiểm tra nếu nhận được tín hiệu TRIGGERED
+        if "TRIGGERED" in data.upper():
+            print(f"[Trigger] Serial signal received: {data.strip()}")
+            self._take_snapshot()
 
     def _on_frame_received(self, frame):
         """Hiển thị frame lên ViewImage và tự động fit lần đầu."""
@@ -269,6 +301,7 @@ class MainWindow(QMainWindow):
             return
             
         try:
+            self._last_frame = frame.copy() if frame is not None else None
             self.view_image.add_image(frame)
             
             if self._first_frame:
