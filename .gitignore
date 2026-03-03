@@ -11,3 +11,6 @@ resources
 test
 venv311
 *.jpg
+*.rar
+*.zip
+

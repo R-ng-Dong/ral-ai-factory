@@ -26,6 +26,7 @@ from .processors._thresh_Check import ThreshCheck
 from .processors.base import Processor, ConfigPanel, ProcessResult
 from .processors.color_check import ColorCheckProcessor
 from .processors.solder_check import SoilderCheckProcessor
+from .processors.screw_check import ScrewCheckProcessor
 
 
 class BaseYoloAgent(QWidget, Ui_Form):
@@ -96,6 +97,7 @@ class BaseYoloAgent(QWidget, Ui_Form):
         # Initialize default processors
         self.add_processor(ColorCheckProcessor())
         self.add_processor(SoilderCheckProcessor())
+        self.add_processor(ScrewCheckProcessor())
 
     # ----------------------------- Properties -----------------------------
     @property
