@@ -11,6 +11,7 @@ from PySide6.QtCore import Signal
 class ProcessResult:
     status: str
     yolo_results: list[Results]
+    meta: dict[str, Any] = None
 
 
 class Processor(Protocol):

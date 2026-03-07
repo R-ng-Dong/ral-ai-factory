@@ -3,6 +3,7 @@ import numpy as np
 from ultralytics.models import YOLO
 from PySide6.QtCore import QThread, Signal
 from .utils import to_rgb
+import cv2
 
 
 class YoloWorker(QThread):
@@ -58,6 +59,15 @@ class YoloWorker(QThread):
                     self.msleep(10)
                     continue
                 else:
+                    # rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # YOLO da tu xu ly BGR
+                    # Log kích thước ảnh lần đầu hoặc khi đổi model
+                    # if not hasattr(self, "_logged_once") or self._logged_once != frame.shape:
+                    #     h, w, c = frame.shape
+                    #     print(f"\n[AI Debug] Camera Frame Resolution: {w}x{h} (Channels: {c})")
+                    #     self._logged_once = frame.shape
+
+                    # Tăng imgsz=1280 để nhận diện vật thể nhỏ/xa tốt hơn
+                    # result = model.predict(frame, conf=conf, verbose=False, imgsz=640)
                     result = model.predict(frame, conf=conf, verbose=False)
                     self.result_ready.emit(result)
             except Exception as e:

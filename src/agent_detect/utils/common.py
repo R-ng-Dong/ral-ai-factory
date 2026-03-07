@@ -205,3 +205,54 @@ def put_status(frame: np.ndarray, status: str, font_scale: float = 1.0) -> np.nd
 
     # phát frame ra ngoài
     return frame
+
+
+def draw_info_box(frame: np.ndarray, meta: dict[str, any]) -> np.ndarray:
+    """
+    Vẽ khung thông tin overlay lên frame.
+    meta: {
+        'vít': {required, detected},
+        'lỗ vít': {required, detected},
+        'accuracy': float (0..100)
+    }
+    """
+    if not meta:
+        return frame
+
+    h, w = frame.shape[:2]
+    # Kích thước box
+    bw, bh = 220, 120
+    px, py = 10, 60  # Vị trí (sau status)
+
+    # Vẽ nền bán trong suốt
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (px, py), (px + bw, py + bh), (40, 40, 40), -1)
+    cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
+
+    # Vẽ viền
+    cv2.rectangle(frame, (px, py), (px + bw, py + bh), (200, 200, 200), 1)
+
+    # Nội dung
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    fs = 0.55
+    color = (255, 255, 255)
+    thick = 1
+
+    # Dòng 1: Vít
+    screw = meta.get("vít", {"required": 0, "detected": 0})
+    s_text = f"Vit: {screw['detected']}/{screw['required']}"
+    cv2.putText(frame, s_text, (px + 10, py + 30), font, fs, color, thick, cv2.LINE_AA)
+
+    # Dòng 2: Lỗ vít
+    hole = meta.get("lỗ vít", {"required": 0, "detected": 0})
+    h_text = f"Lo vit: {hole['detected']}/{hole['required']}"
+    cv2.putText(frame, h_text, (px + 10, py + 60), font, fs, color, thick, cv2.LINE_AA)
+
+    # Dòng 3: Độ chính xác
+    acc = meta.get("accuracy", 0.0)
+    a_text = f"Accuracy: {acc:.1f}%"
+    # Đổi màu theo độ chính xác
+    a_color = (0, 255, 0) if acc > 80 else (0, 255, 255) if acc > 50 else (0, 0, 255)
+    cv2.putText(frame, a_text, (px + 10, py + 95), font, 0.6, a_color, 2, cv2.LINE_AA)
+
+    return frame

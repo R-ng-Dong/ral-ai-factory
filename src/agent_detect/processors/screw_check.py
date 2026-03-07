@@ -25,24 +25,20 @@ def compare_object_counts(
 ) -> dict[int, dict[str, Any]]:
     """
     So sánh số lượng vít phát hiện từ YOLO (theo class_id) với số lượng yêu cầu.
-
-    Tham số:
-        results: Danh sách kết quả từ YOLO.
-        required_counts: Dict[class_id -> required_count].
-
-    Trả về:
-        Dict[class_id -> {'required', 'detected', 'match', 'difference'}]
     """
     detected_counts = {cid: 0 for cid in required_counts}
+    confidences = {cid: [] for cid in required_counts}
 
     for result in results:
         boxes = getattr(result, "boxes", None)
         if boxes is None:
             continue
-        for cls_val in boxes.cls:
+        for cls_val, conf_val in zip(boxes.cls, boxes.conf):
             class_id = int(getattr(cls_val, "item", lambda: cls_val)())
+            conf = float(getattr(conf_val, "item", lambda: conf_val)())
             if class_id in required_counts:
                 detected_counts[class_id] += 1
+                confidences[class_id].append(conf)
 
     return {
         cid: {
@@ -50,6 +46,7 @@ def compare_object_counts(
             "detected": detected_counts[cid],
             "match": required_counts[cid] == detected_counts[cid],
             "difference": detected_counts[cid] - required_counts[cid],
+            "confidences": confidences[cid],
         }
         for cid in required_counts
     }
@@ -80,21 +77,55 @@ class ScrewCheckProcessor(Processor):
         if not yolo_results:
             return ProcessResult(status="ERR", yolo_results=[])
 
-        screws = self.settings.get("screws")
-        qtys = self.settings.get("quantity")
-        if not screws or not qtys or len(screws) != len(qtys):
+        screws_cfg = self.settings.get("screws")
+        qtys_cfg = self.settings.get("quantity")
+        class_names = self.settings.get("name", {})
+        
+        if not screws_cfg or not qtys_cfg or len(screws_cfg) != len(qtys_cfg):
             return ProcessResult(status="ERR", yolo_results=yolo_results)
 
         try:
-            cid_list = [int(x) for x in screws]
-            qty_list = [int(x) for x in qtys]
+            cid_list = [int(x) for x in screws_cfg]
+            qty_list = [int(x) for x in qtys_cfg]
         except Exception:
             return ProcessResult(status="ERR", yolo_results=yolo_results)
 
         required_counts = dict(zip(cid_list, qty_list))
         comparison = compare_object_counts(yolo_results, required_counts)
+        
+        # Phân loại để hiển thị Overlay (vít vs lỗ vít)
+        meta = {
+            "vít": {"required": 0, "detected": 0},
+            "lỗ vít": {"required": 0, "detected": 0},
+            "accuracy": 0.0
+        }
+        
+        all_confs = []
+        print("\n--- AI Screw Check Log ---")
+        for cid, info in comparison.items():
+            name = str(class_names.get(cid, f"Class {cid}")).lower()
+            # Hỗ trợ cả 'vít' (có dấu) và 'vit' (không dấu)
+            key = "vít" if any(kw in name for kw in ["vít", "vit", "screw"]) else "lỗ vít"
+            
+            meta[key]["required"] += info["required"]
+            meta[key]["detected"] += info["detected"]
+            all_confs.extend(info["confidences"])
+            
+            # Log terminal
+            match_str = "OK" if info["match"] else "NG"
+            print(f"[{match_str}] {name.upper()}: Yeu cau {info['required']} - Phat hien {info['detected']}")
+            if info["confidences"]:
+                avg_c = sum(info["confidences"]) / len(info["confidences"])
+                print(f"    > Do tin cay TB: {avg_c:.2%}")
+
+        if all_confs:
+            meta["accuracy"] = (sum(all_confs) / len(all_confs)) * 100
+            print(f"==> DO CHINH XAC TONG: {meta['accuracy']:.1f}%")
+        
         status = "OK" if all(v["match"] for v in comparison.values()) else "NG"
-        return ProcessResult(status=status, yolo_results=yolo_results)
+        print(f"KẾT QUẢ CUỐI CÙNG: {status}")
+        
+        return ProcessResult(status=status, yolo_results=yolo_results, meta=meta)
 
 
 TEST_SCREW = {0: "Vít loại 1", 1: "Vít loại 2"}

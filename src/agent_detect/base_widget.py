@@ -18,7 +18,8 @@ from PySide6.QtCore import Signal, QTimer, Qt, QPoint
 from PySide6.QtGui import QAction
 
 from .ui.yolo_agent_ui import Ui_Form
-from .utils import ShowResultsDialog, plot, put_status
+from .utils import ShowResultsDialog
+from .utils.common import plot, put_status, draw_info_box
 from .worker import YoloWorker
 
 from .processors._thresh_Check import ThreshCheck
@@ -140,7 +141,7 @@ class BaseYoloAgent(QWidget, Ui_Form):
         if not result:
             f = put_status(
                 frame,
-                f"Không phát hiện. Độ sáng trung bình: {self.thresh_config._avg_brightness}",
+                f"KHONG PHAT HIEN. DO SANG TRUNG BINH: {self.thresh_config._avg_brightness}",
                 1.2,
             )
             result = ProcessResult(status="N/A", yolo_results=[])
@@ -167,6 +168,10 @@ class BaseYoloAgent(QWidget, Ui_Form):
             output = self._active_proc.process(results)
 
             frame = put_status(frame, output.status, 1.2)
+            
+            # Nếu có thông tin meta (như trong ScrewCheck), vẽ overlay
+            if output.meta:
+                frame = draw_info_box(frame, output.meta)
 
             self.frame_ready.emit(frame)
             self.result_ready.emit(output)
