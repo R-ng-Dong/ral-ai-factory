@@ -1,4 +1,5 @@
 from typing import Any
+import time
 from PySide6.QtWidgets import QVBoxLayout
 from ultralytics.engine.results import Results
 
@@ -71,7 +72,13 @@ class ScrewCheckProcessor(Processor):
         return self.panel.dump_settings()
 
     def load_settings(self, s: dict[str, Any]) -> None:
+        """Nạp cấu hình từ dict vào panel và đồng bộ ngay bộ nhớ Processor."""
+        # Nạp vào UI panel
         self.panel.load_settings(s)
+        # BUG FIX: Đồng bộ ngay tức thì vào self.settings của Processor 
+        # để đảm bảo AI có dữ liệu chạy ngay mà không cần chờ nút Confirm
+        self.settings = self.panel.dump_settings()
+        print(f"[Debug] ScrewCheckProcessor: Đã tự động nạp {len(self.settings.get('screws', []))} loại vít.")
 
     def process(self, yolo_results: list[Results]) -> ProcessResult:
         if not yolo_results:
@@ -81,13 +88,21 @@ class ScrewCheckProcessor(Processor):
         qtys_cfg = self.settings.get("quantity")
         class_names = self.settings.get("name", {})
         
-        if not screws_cfg or not qtys_cfg or len(screws_cfg) != len(qtys_cfg):
+        if not screws_cfg or not qtys_cfg:
+            if not hasattr(self, "_last_na_log") or (time.time() - self._last_na_log > 5):
+                print(f"[AI Info] CHƯA CÀI ĐẶT KIỂM TRA VÍT (Đang ở trạng thái N/A). Vui lòng thêm dòng vào bảng.")
+                self._last_na_log = time.time()
+            return ProcessResult(status="N/A", yolo_results=yolo_results)
+            
+        if len(screws_cfg) != len(qtys_cfg):
+            print(f"[AI Error] Sai số lượng dòng cấu hình: {len(screws_cfg)} != {len(qtys_cfg)}")
             return ProcessResult(status="ERR", yolo_results=yolo_results)
 
         try:
             cid_list = [int(x) for x in screws_cfg]
             qty_list = [int(x) for x in qtys_cfg]
-        except Exception:
+        except Exception as e:
+            print(f"[AI Error] Loi format ID/So luong: {e}")
             return ProcessResult(status="ERR", yolo_results=yolo_results)
 
         required_counts = dict(zip(cid_list, qty_list))
@@ -265,9 +280,16 @@ class ScrewCheckConfigPanel(ConfigPanel):
                 item.setText(class_names[cid])
 
     def load_settings(self, s: dict[str, Any]) -> None:
+        # Xoá bảng cũ trước khi nạp
+        self._table_widget.setRowCount(0)
+        
         self._screws = s.get("name", TEST_SCREW)
         screws = s.get("screws", [])
         qtys = s.get("quantity", [])
+        
+        if not screws:
+            print("[Warning] Load settings ScrewCheck: Danh sach vít trống.")
+            
         for cid, q in zip(screws, qtys):
             self._add_row(int(cid), int(q) or 0)
 

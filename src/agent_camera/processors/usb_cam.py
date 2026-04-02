@@ -250,8 +250,8 @@ class UsbCameraProcessor(Processor):
         if self.settings.trigger_mode and not self._want_shot:
             return None
 
-        # Đọc khung mới nhất (flush nhẹ để tránh chậm 1 frame)
-        frame = self._read_latest_frame(flush_count=3)
+        # Đọc khung mới nhất (Vì đã đặt BufferSize=1 nên chỉ cần đọc 1 lần là đủ ảnh mới)
+        frame = self._read_latest_frame(flush_count=1)
         if frame is None:
             return None
 

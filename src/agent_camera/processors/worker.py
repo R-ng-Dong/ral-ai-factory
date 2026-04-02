@@ -36,10 +36,10 @@ class Worker(QThread):
             try:
                 frame = self.camera_instance.get_frame()
                 if frame is None:
-                    time.sleep(0.01)
+                    time.sleep(0.03) # Tăng lên 30ms cho camera thường
                     continue
                 self.frame_ready.emit(frame)
-                time.sleep(0.01)
+                time.sleep(0.03) # Khớp với tốc độ 30fps phổ biến
             except Exception as e:
                 print(f"[Worker Error] {e}")
                 time.sleep(0.1)

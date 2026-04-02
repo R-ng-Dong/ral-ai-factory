@@ -187,7 +187,7 @@ def put_status(frame: np.ndarray, status: str, font_scale: float = 1.0) -> np.nd
     elif st == "ng":
         color = (0, 0, 255)  # đỏ
     elif st == "err":
-        color = (0, 255, 255)  # vàng
+        color = (0, 150, 255)  # vàng
     else:
         color = (255, 255, 255)  # trắng (hoặc bạn đổi sang tím, xanh dương...)
 

@@ -24,7 +24,9 @@ class YoloWorker(QThread):
 
     def on_frame_ready(self, frame: np.ndarray):
         """Set frame for processing."""
-        self._frame = to_rgb(frame.copy())
+        # Chỉ copy và lưu frame nếu worker đang rảnh (None)
+        if self._frame is None:
+            self._frame = frame.copy()
 
     def set_model(self, model: str | Path) -> YOLO:
         self._model = YOLO(model)
@@ -56,10 +58,11 @@ class YoloWorker(QThread):
                 conf = self._conf
 
                 if model is None:
-                    self.msleep(10)
+                    self.msleep(100) # Nghỉ lâu hơn nếu không có model
                     continue
                 else:
-                    # rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # YOLO da tu xu ly BGR
+                    # Tiền xử lý RGB trong luồng worker để giảm tải cho Main UI
+                    input_frame = to_rgb(frame) 
                     # Log kích thước ảnh lần đầu hoặc khi đổi model
                     # if not hasattr(self, "_logged_once") or self._logged_once != frame.shape:
                     #     h, w, c = frame.shape
@@ -67,16 +70,17 @@ class YoloWorker(QThread):
                     #     self._logged_once = frame.shape
 
                     # Tăng imgsz=1280 để nhận diện vật thể nhỏ/xa tốt hơn
-                    # result = model.predict(frame, conf=conf, verbose=False, imgsz=640)
-                    result = model.predict(frame, conf=conf, verbose=False)
+                    # result = model.predict(input_frame, conf=conf, verbose=False, imgsz=640)
+                    result = model.predict(input_frame, conf=conf, verbose=False)
                     self.result_ready.emit(result)
             except Exception as e:
                 import traceback
-
                 self.error.emit(f"Prediction error: {str(e)}\n{traceback.format_exc()}")
             finally:
                 self._frame = None
-            self.msleep(10)
+            
+            # GIỚI HẠN TỐC ĐỘ AI (100ms = 10 FPS) để giảm tải CPU
+            self.msleep(100)
 
         # điểm dọn dẹp cuối thread
         self._cleanup()

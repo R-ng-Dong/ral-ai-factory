@@ -1,17 +1,40 @@
 {
     "detect": {
-        "model_path": null,
-        "model_conf": 50,
-        "active_index": 0,
-        "active_name": "Kiểm màu dây",
-        "panel": {
-            "name": {
-                "1": "màu 1",
-                "2": "màu 2",
-                "3": "màu 3"
+        "model_path": "F:/Camera/Models/best(5).pt",
+        "model_conf": 80,
+        "active_index": 2,
+        "active_name": "Kiểm tra bắt vít",
+        "all_panels": {
+            "Kiểm màu dây": {
+                "name": {
+                    "1": "màu 1",
+                    "2": "màu 2",
+                    "3": "màu 3"
+                },
+                "colors": [],
+                "sort_direction": "X"
             },
-            "colors": [],
-            "sort_direction": "X"
+            "Kiểm mối hàn": {
+                "name": {
+                    "1": "Loại 1",
+                    "2": "Loại 2",
+                    "3": "Loại 3"
+                },
+                "solders": [],
+                "quantity": []
+            },
+            "Kiểm tra bắt vít": {
+                "name": {
+                    "0": "lovit",
+                    "1": "vit"
+                },
+                "screws": [
+                    1
+                ],
+                "quantity": [
+                    7
+                ]
+            }
         },
         "thresh_config": {
             "roi": [
@@ -21,7 +44,7 @@
                 0.0
             ],
             "is_roi": false,
-            "bright_thresh": 100,
+            "bright_thresh": 50,
             "is_brighter": true
         },
         "plot_config": {
@@ -36,5 +59,27 @@
             "line_width": 3
         }
     },
-    "protocol": {}
+    "protocol": {
+        "SerialClient": {
+            "type": "SerialClient",
+            "settings": {
+                "port_name": "COM35",
+                "baud_rate": 9600,
+                "auto": false
+            }
+        }
+    },
+    "trigger_mode": 1,
+    "camera": {
+        "camera_type": 3,
+        "panel": {
+            "dev": null,
+            "ip": null,
+            "exposure": 0,
+            "exposure_auto": false,
+            "trigger_mode": false,
+            "advanced": {}
+        },
+        "shot_path": ""
+    }
 }

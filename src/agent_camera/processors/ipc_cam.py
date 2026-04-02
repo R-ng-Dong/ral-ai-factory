@@ -148,12 +148,14 @@ class IpcCameraProcessor(Processor):
                     if frame_id != last_frame_id:
                         last_frame_id = frame_id
                         self.frame_ready.emit(frame)
+                        # Nghỉ một chút để Camera DVP nạp frame tiếp theo
+                        time.sleep(0.01) # 10ms
                     else:
-                        # Same frame, sleep a bit to save CPU
+                        # Same frame, sleep to save CPU
                         time.sleep(0.005) # 5ms
                 else:
                     # SHM not ready yet or read failed
-                    time.sleep(0.1)
+                    time.sleep(0.033) # Match 30fps
                     
             except Exception as e:
                 print(f"[IPC] Loop error: {e}")

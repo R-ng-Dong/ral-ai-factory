@@ -299,6 +299,12 @@ class BaseYoloAgent(QWidget, Ui_Form):
         self.processorChanged.emit(1)
         self.active_name = self._active_proc.name
         self._active_proc.panel.set_class_names(self._model_name)
+        
+        # Kết nối để tự động Áp dụng (Confirm) khi có bất kỳ thay đổi nào trên panel
+        self._active_proc.panel.configChanged.connect(
+            self._on_confirm, Qt.ConnectionType.UniqueConnection
+        )
+        # Đồng thời vẫn giữ signal báo hiệu thay đổi (dấu *)
         self._active_proc.panel.configChanged.connect(
             self._on_processor_changed, Qt.ConnectionType.UniqueConnection
         )
@@ -345,26 +351,24 @@ class BaseYoloAgent(QWidget, Ui_Form):
         print("Applied settings:", settings) if self.sender() else None
 
     def dump_settings(self) -> dict[str, Any]:
-        """
-        Lưu cả:
-          - đường dẫn model (nếu có)
-          - độ tự tin conf (0..1)
-          - processor đang chọn
-          - cấu hình panel hiện tại (nếu có)
-        """
-        panel_cfg: dict[str, Any] = {}
-        if self._active_proc and isinstance(self._active_proc.panel, ConfigPanel):
-            try:
-                panel_cfg = self._active_proc.panel.dump_settings()
-            except Exception:
-                panel_cfg = {}
+        """Lưu cấu hình của tất cả các Processors và các thông số chung."""
+        # Lưu cấu hình từng panel của mỗi processor
+        all_panels_cfg = {}
+        for i in range(self.comboMode.count()):
+            proc = self.comboMode.itemData(i)
+            name = self.comboMode.itemText(i).removesuffix("*")
+            if proc and hasattr(proc, 'panel'):
+                try:
+                    all_panels_cfg[name] = proc.panel.dump_settings()
+                except Exception:
+                    all_panels_cfg[name] = {}
 
         data: dict[str, Any] = {
             "model_path": self._model_path,
             "model_conf": self._model_conf,
             "active_index": self.comboMode.currentIndex(),
             "active_name": self._active_proc.name if self._active_proc else None,
-            "panel": panel_cfg,
+            "all_panels": all_panels_cfg, # Lưu tất cả thay vì chỉ 'panel'
             "thresh_config": self.thresh_config.to_dict(),
             "plot_config": self.plot_config.to_dict(),
         }
@@ -373,11 +377,30 @@ class BaseYoloAgent(QWidget, Ui_Form):
     def load_settings(self, settings: dict[str, Any]):
         if not settings:
             return
+            
+        # 1. Nạp model và cấu hình cơ bản
         self.__load_model(settings.get("model_path"))
         self._model_conf = settings.get("model_conf", 50)
-        self._active_proc = settings.get("active_index", 0)
-        self._active_proc.load_settings(settings.get("panel", {}))
-
+        
+        # 2. Nạp cấu hình cho TẤT CẢ các processors
+        all_panels = settings.get("all_panels", {})
+        # Hỗ trợ nạp từ format cũ 'panel' nếu có
+        old_panel = settings.get("panel")
+        
+        for i in range(self.comboMode.count()):
+            proc = self.comboMode.itemData(i)
+            name = self.comboMode.itemText(i).removesuffix("*")
+            if proc:
+                p_cfg = all_panels.get(name) or (old_panel if name == settings.get("active_name") else None)
+                if p_cfg:
+                    proc.load_settings(p_cfg)
+        
+        # 3. Chuyển sang Processor tích cực
+        active_idx = settings.get("active_index", 0)
+        if 0 <= active_idx < self.comboMode.count():
+            self.comboMode.setCurrentIndex(active_idx)
+            self.stackPanel.setCurrentIndex(active_idx)
+            
         self.plot_config.from_dict(settings.get("plot_config", {}))
         self.thresh_config.from_dict(settings.get("thresh_config", {}))
 

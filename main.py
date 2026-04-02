@@ -31,6 +31,9 @@ from PySide6.QtWidgets import (
     QStatusBar,
     QMenuBar,
     QMessageBox,
+    QComboBox,
+    QGroupBox,
+    QFormLayout,
 )
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QIcon
@@ -78,6 +81,7 @@ class MainWindow(QMainWindow):
         # Trạng thái
         self._first_frame = True
         self._last_frame = None # Lưu frame mới nhất
+        self._is_waiting_for_trigger_result = False # Cờ chờ kết quả AI sau khi trigger
         
         # Setup folders
         self._init_folders()
@@ -214,6 +218,17 @@ class MainWindow(QMainWindow):
         action_group.setLayout(action_layout)
         layout.addWidget(action_group)
         
+        # Trigger Trigger mode group
+        trigger_group = QGroupBox("Chế độ kích hoạt (Trigger)")
+        trigger_layout = QFormLayout()
+        
+        self.trigger_mode_combo = QComboBox()
+        self.trigger_mode_combo.addItems(["Lấy mẫu (Sampling)", "Kiểm tra lỗi (AI Error Check)"])
+        trigger_layout.addRow("Chế độ:", self.trigger_mode_combo)
+        
+        trigger_group.setLayout(trigger_layout)
+        layout.addWidget(trigger_group)
+        
         layout.addStretch()
         return widget
         
@@ -298,7 +313,18 @@ class MainWindow(QMainWindow):
         # Kiểm tra nếu nhận được tín hiệu TRIGGERED
         if "TRIGGERED" in data.upper():
             print(f"[Trigger] Serial signal received: {data.strip()}")
-            self._take_snapshot()
+            
+            mode = self.trigger_mode_combo.currentText()
+            if "Kiểm tra lỗi" in mode or "Error Check" in mode:
+                # Đánh dấu chờ kết quả AI
+                self._is_waiting_for_trigger_result = True
+                print("[Trigger Mode] AI Error Check activated...")
+                # Vẫn nên chụp ảnh log nếu cần
+                # self._take_snapshot()
+            else:
+                # Mặc định là lấy mẫu
+                print("[Trigger Mode] Taking snapshot...")
+                self._take_snapshot()
 
     def _on_frame_received(self, frame):
         """Hiển thị frame lên ViewImage và tự động fit lần đầu."""
@@ -321,7 +347,24 @@ class MainWindow(QMainWindow):
             status = result.status if hasattr(result, 'status') else str(result)
             self.status_bar.showMessage(f"AI Status: {status}", 2000)
             
-            # TODO: Có thể gửi kết quả qua Protocol nếu cần
+            # Xử lý Trigger result nếu đang chờ
+            if hasattr(self, '_is_waiting_for_trigger_result') and self._is_waiting_for_trigger_result:
+                self._is_waiting_for_trigger_result = False
+                
+                # Biến status thường có dạng OK, PASS, NG, FAIL...
+                st_upper = status.upper()
+                if st_upper in ["OK", "PASS", "GOOD"]:
+                    print(f"[Triggered Result] PASS ({status}) -> Gửi tín hiệu PASS\n")
+                    if hasattr(self, 'protocol_widget'):
+                        self.protocol_widget.tx_data.emit("PASS\n")
+                    self.status_bar.showMessage("✓ KẾT QUẢ ĐẠT (PASS) - Đã gửi tín hiệu", 4000)
+                else:
+                    print(f"[Triggered Result] FAIL ({status}) -> Gửi tín hiệu FAIL\n")
+                    if hasattr(self, 'protocol_widget'):
+                        self.protocol_widget.tx_data.emit("FAIL\n")
+                    self.status_bar.showMessage(f"✗ KẾT QUẢ LỖI ({status}) - Đã gửi tín hiệu", 4000)
+            
+            # Gửi kết quả qua Protocol nếu cần (tuỳ chọn thêm)
             # self.protocol_widget.send_data(result)
         except Exception as e:
             print(f"Lỗi xử lý kết quả AI: {e}")
@@ -363,6 +406,7 @@ class MainWindow(QMainWindow):
             settings = {
                 "detect": self.detect_widget.dump_settings() if hasattr(self.detect_widget, 'dump_settings') else {},
                 "protocol": self.protocol_widget.to_dict() if hasattr(self.protocol_widget, 'to_dict') else {},
+                "trigger_mode": self.trigger_mode_combo.currentIndex() if hasattr(self, 'trigger_mode_combo') else 0,
             }
             if hasattr(self.camera_widget, 'dump_settings'):
                 settings["camera"] = self.camera_widget.dump_settings()
@@ -385,6 +429,10 @@ class MainWindow(QMainWindow):
                     self.detect_widget.load_settings(settings["detect"])
                 if "protocol" in settings and hasattr(self.protocol_widget, 'from_dict'):
                     self.protocol_widget.from_dict(settings["protocol"])
+                
+                if "trigger_mode" in settings and hasattr(self, 'trigger_mode_combo'):
+                    self.trigger_mode_combo.setCurrentIndex(settings["trigger_mode"])
+                    
                 self.status_bar.showMessage("✓ Đã tải cấu hình thành công", 3000)
         except Exception as e:
             print(f"Lỗi tải cấu hình: {e}")
